@@ -130,7 +130,8 @@
 
     - name: Join worker to the cluster
       ansible.builtin.shell: "{{ hostvars['kube_master']['worker_join'] }}"
-      
+      register: join_output
+          
     - name: Show join output
       ansible.builtin.debug:
         msg: "{{ join_output.stdout }}"
