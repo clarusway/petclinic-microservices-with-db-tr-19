@@ -26,6 +26,7 @@
           - apt-transport-https
           - curl
           - ca-certificates
+          - gpg
         state: present
 
     - name: update apt-get and install kube packages
