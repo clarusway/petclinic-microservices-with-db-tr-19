@@ -4,11 +4,11 @@
   tasks:
 
     - name: Set hostname from private DNS name
-      hostname:
+      ansible.builtin.hostname:
         name: "{{ hostvars[inventory_hostname]['private_dns_name'] }}"
 
     - name: Enable bridged networking and IP forwarding
-      copy:
+      ansible.builtin.copy:
         dest: /etc/sysctl.d/k8s.conf
         content: |
           net.bridge.bridge-nf-call-ip6tables = 1
@@ -17,11 +17,11 @@
       notify: Reload sysctl
 
     - name: Update apt cache
-      apt:
-        update_cache: yes
+      ansible.builtin.apt:
+        update_cache: true
 
     - name: Install required base packages
-      apt:
+      ansible.builtin.apt:
         name:
           - apt-transport-https
           - curl
@@ -29,18 +29,19 @@
         state: present
 
     - name: Add Kubernetes GPG key
-      apt_key:
+      ansible.builtin.get_url:
         url: https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key
-        state: present
+        dest: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+        mode: '0644'
 
     - name: Add Kubernetes repository
-      apt_repository:
-        repo: deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /
-        state: present
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /"
         filename: kubernetes
+        state: present
 
     - name: Install Kubernetes packages
-      apt:
+      ansible.builtin.apt:
         name:
           - kubelet=1.30.0-1.1
           - kubeadm=1.30.0-1.1
@@ -50,35 +51,35 @@
         state: present
 
     - name: Hold Kubernetes packages
-      shell: apt-mark hold kubelet kubeadm kubectl
+      ansible.builtin.command: apt-mark hold kubelet kubeadm kubectl
 
     - name: Add ubuntu user to docker group
-      user:
+      ansible.builtin.user:
         name: ubuntu
         groups: docker
-        append: yes
+        append: true
 
     - name: Enable and restart Docker
-      service:
+      ansible.builtin.service:
         name: docker
         state: restarted
-        enabled: yes
+        enabled: true
 
     - name: Configure containerd cgroup driver
-      shell: |
+      ansible.builtin.shell: |
         mkdir -p /etc/containerd
         containerd config default > /etc/containerd/config.toml
         sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
 
     - name: Enable and restart containerd
-      service:
+      ansible.builtin.service:
         name: containerd
         state: restarted
-        enabled: yes
+        enabled: true
 
   handlers:
     - name: Reload sysctl
-      command: sysctl --system
+      ansible.builtin.command: sysctl --system
 
 - name: Kubernetes Cluster - Master Node Configuration
   hosts: role_master
@@ -86,43 +87,42 @@
   tasks:
 
     - name: Pull Kubernetes images
-      command: kubeadm config images pull
+      ansible.builtin.command: kubeadm config images pull
 
     - name: Initialize Kubernetes master
-      command: kubeadm init --pod-network-cidr=10.244.0.0/16 --ignore-preflight-errors=All
+      ansible.builtin.command: kubeadm init --pod-network-cidr=10.244.0.0/16 --ignore-preflight-errors=All
 
     - name: Configure kubeconfig for ubuntu user
-      # become_user: root
-      shell: |
+      ansible.builtin.shell: |
         mkdir -p /home/ubuntu/.kube
         cp -i /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
         chown ubuntu:ubuntu /home/ubuntu/.kube/config
 
     - name: Install Flannel CNI
+      ansible.builtin.shell: kubectl apply -f https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml
       become: false
       remote_user: ubuntu
-      shell: kubectl apply -f https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml
 
     - name: Generate kubeadm join command
-      command: kubeadm token create --print-join-command
+      ansible.builtin.command: kubeadm token create --print-join-command
       register: join_command
 
     - name: Show join command
-      debug:
+      ansible.builtin.debug:
         msg: "{{ join_command.stdout }}"
 
     - name: Save join command for worker nodes
-      add_host:
+      ansible.builtin.add_host:
         name: kube_master
         worker_join: "{{ join_command.stdout }}"
 
     - name: Install Helm
-      become: false
-      remote_user: ubuntu
-      shell: |
+      ansible.builtin.shell: |
         curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
         chmod +x get_helm.sh
         ./get_helm.sh
+      become: false
+      remote_user: ubuntu
 
 - name: Kubernetes Cluster - Worker Node Configuration
   hosts: role_worker
@@ -130,8 +130,9 @@
   tasks:
 
     - name: Join worker to the cluster
-      shell: "{{ hostvars['kube_master']['worker_join'] }}"
+      ansible.builtin.shell: "{{ hostvars['kube_master']['worker_join'] }}"
       register: join_output
 
-    - debug:
+    - name: Show join output
+      ansible.builtin.debug:
         msg: "{{ join_output.stdout }}"
