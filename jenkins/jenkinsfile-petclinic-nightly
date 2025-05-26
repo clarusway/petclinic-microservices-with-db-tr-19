@@ -111,57 +111,57 @@ pipeline {
                 sh "helm s3 push --force petclinic_chart-${BUILD_NUMBER}.tgz stable-petclinic"
                 sh "envsubst < ansible/playbooks/dev-petclinic-deploy-template > ansible/playbooks/dev-petclinic-deploy.yaml"
                 sh "sleep 60"    
-                // sh "ansible-playbook -i ./ansible/inventory/dev_stack_dynamic_inventory_aws_ec2.yaml ./ansible/playbooks/dev-petclinic-deploy.yaml"
+                sh "ansible-playbook -i ./ansible/inventory/dev_stack_dynamic_inventory_aws_ec2.yaml ./ansible/playbooks/dev-petclinic-deploy.yaml || while [ ! -f myfile ]; do sleep 1; done"
             }
         }     
 
-        // stage('Test the Application Deployment'){
-        //     steps {
-        //         echo "Check if the ${APP_NAME} app is ready or not"
-        //         script {
-        //             env.MASTER_PUBLIC_IP = sh(script:"aws ec2 describe-instances --region ${AWS_REGION} --filters Name=tag-value,Values=master Name=tag-value,Values=tera-kube-ans Name=instance-state-name,Values=running --query Reservations[*].Instances[*].[PublicIpAddress] --output text", returnStdout:true).trim()
-        //             while(true) {
-        //                 try{
-        //                     sh "curl -s ${MASTER_PUBLIC_IP}:30001"
-        //                     echo "${APP_NAME} app is successfully deployed."
-        //                     break
-        //                 }
-        //                 catch(Exception){
-        //                     echo "Could not connect to ${APP_NAME} app"
-        //                     sleep(5)
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
+        stage('Test the Application Deployment'){
+            steps {
+                echo "Check if the ${APP_NAME} app is ready or not"
+                script {
+                    env.MASTER_PUBLIC_IP = sh(script:"aws ec2 describe-instances --region ${AWS_REGION} --filters Name=tag-value,Values=master Name=tag-value,Values=tera-kube-ans Name=instance-state-name,Values=running --query Reservations[*].Instances[*].[PublicIpAddress] --output text", returnStdout:true).trim()
+                    while(true) {
+                        try{
+                            sh "curl -s ${MASTER_PUBLIC_IP}:30001"
+                            echo "${APP_NAME} app is successfully deployed."
+                            break
+                        }
+                        catch(Exception){
+                            echo "Could not connect to ${APP_NAME} app"
+                            sleep(5)
+                        }
+                    }
+                }
+            }
+        }
 
-        // stage('Run QA Automation Tests'){
-        //     steps {
-        //         echo "Run the Selenium Functional Test on QA Environment"
-        //         sh 'ansible-playbook -vvv --connection=local --inventory 127.0.0.1, --extra-vars "workspace=${WORKSPACE} master_public_ip=${MASTER_PUBLIC_IP}" ./ansible/playbooks/pb_run_selenium_jobs.yaml'
-        //     }
-        // }
+        stage('Run QA Automation Tests'){
+            steps {
+                echo "Run the Selenium Functional Test on QA Environment"
+                sh 'ansible-playbook -vvv --connection=local --inventory 127.0.0.1, --extra-vars "workspace=${WORKSPACE} master_public_ip=${MASTER_PUBLIC_IP}" ./ansible/playbooks/pb_run_selenium_jobs.yaml'
+            }
+        }
  }
 
-    // post {
-    //     always {
-    //         echo 'Deleting all local images'
-    //         sh 'docker image prune -af'
-    //         echo 'Delete the Image Repository on ECR'
-    //         sh """
-    //             aws ecr delete-repository \
-    //               --repository-name ${APP_REPO_NAME} \
-    //               --region ${AWS_REGION}\
-    //               --force
-    //             """
-    //         echo 'Tear down the Kubernetes Cluster'
-    //         sh """
-    //         cd infrastructure/dev-k8s-terraform
-    //         terraform destroy -auto-approve -no-color
-    //         """
-    //         echo "Delete existing key pair using AWS CLI"
-    //         sh "aws ec2 delete-key-pair --region ${AWS_REGION} --key-name ${ANS_KEYPAIR}"
-    //         sh "rm -rf ${ANS_KEYPAIR}"
-    //     }
-    // }
+    post {
+        always {
+            echo 'Deleting all local images'
+            sh 'docker image prune -af'
+            echo 'Delete the Image Repository on ECR'
+            sh """
+                aws ecr delete-repository \
+                  --repository-name ${APP_REPO_NAME} \
+                  --region ${AWS_REGION}\
+                  --force
+                """
+            echo 'Tear down the Kubernetes Cluster'
+            sh """
+            cd infrastructure/dev-k8s-terraform
+            terraform destroy -auto-approve -no-color
+            """
+            echo "Delete existing key pair using AWS CLI"
+            sh "aws ec2 delete-key-pair --region ${AWS_REGION} --key-name ${ANS_KEYPAIR}"
+            sh "rm -rf ${ANS_KEYPAIR}"
+        }
+    }
 }
