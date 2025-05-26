@@ -76,30 +76,30 @@ pipeline {
             }
         }
 
-        stage('Create QA Automation Infrastructure') {
-            steps {
-                echo 'Creating QA Automation Infrastructure for Dev Environment'
-                sh """
-                    cd infrastructure/dev-k8s-terraform
-                    sed -i "s/clarus/$ANS_KEYPAIR/g" main.tf
-                    terraform init
-                    terraform apply -auto-approve -no-color
-                """
-                script {
-                    echo "Kubernetes Master is not UP and running yet."
-                    env.id = sh(script: 'aws ec2 describe-instances --filters Name=tag-value,Values=master Name=tag-value,Values=tera-kube-ans Name=instance-state-name,Values=running --query Reservations[*].Instances[*].[InstanceId] --output text',  returnStdout:true).trim()
-                    sh 'aws ec2 wait instance-status-ok --instance-ids $id'
-                }
-            }
-        }
+        // stage('Create QA Automation Infrastructure') {
+        //     steps {
+        //         echo 'Creating QA Automation Infrastructure for Dev Environment'
+        //         sh """
+        //             cd infrastructure/dev-k8s-terraform
+        //             sed -i "s/clarus/$ANS_KEYPAIR/g" main.tf
+        //             terraform init
+        //             terraform apply -auto-approve -no-color
+        //         """
+        //         script {
+        //             echo "Kubernetes Master is not UP and running yet."
+        //             env.id = sh(script: 'aws ec2 describe-instances --filters Name=tag-value,Values=master Name=tag-value,Values=tera-kube-ans Name=instance-state-name,Values=running --query Reservations[*].Instances[*].[InstanceId] --output text',  returnStdout:true).trim()
+        //             sh 'aws ec2 wait instance-status-ok --instance-ids $id'
+        //         }
+        //     }
+        // }
 
 
-        stage('Create Kubernetes Cluster for QA Automation Build') {
-            steps {
-                echo "Setup Kubernetes cluster for ${APP_NAME} App"
-                sh "ansible-playbook -i ./ansible/inventory/dev_stack_dynamic_inventory_aws_ec2.yaml ./ansible/playbooks/k8s_setup.yaml"
-            }
-        }
+        // stage('Create Kubernetes Cluster for QA Automation Build') {
+        //     steps {
+        //         echo "Setup Kubernetes cluster for ${APP_NAME} App"
+        //         sh "ansible-playbook -i ./ansible/inventory/dev_stack_dynamic_inventory_aws_ec2.yaml ./ansible/playbooks/k8s_setup.yaml"
+        //     }
+        // }
 
         stage('Deploy App on Kubernetes cluster'){
             steps {
